@@ -24,6 +24,9 @@ public:
 {%- if schema.get('messages', {}).get('LoginRequest') %}
     static market::runtime::status decode(const uint8_t* in, size_t in_sz, LoginRequest& out, size_t& consumed);
 {%- endif %}
+{%- if schema.get('messages', {}).get('NewOrderCross') %}
+    static market::runtime::status decode(const uint8_t* in, size_t in_sz, NewOrderCross& out, size_t& consumed);
+{%- endif %}
 };
 
 {%- if ns_parts|length > 1 %}
