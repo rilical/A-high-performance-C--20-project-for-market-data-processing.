@@ -2,18 +2,84 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <array>
+#include <vector>
+#include <optional>
+#include <string_view>
 
-namespace {{ namespace.replace('::', ' { namespace ') }} {
+{%- set ns_parts = protocol.split('_') %}
+{%- if ns_parts|length > 1 %}
 
-// Message structures for {{ protocol }} v{{ version }}
+namespace {{ ns_parts[0] }} { namespace {{ ns_parts[1] }} { namespace v{{ version }} {
+{%- else %}
 
-{% for message_name, message_def in schema.get('messages', {}).items() %}
-struct {{ message_name }} {
-    // TODO: Generated fields for {{ message_name }}
+namespace {{ protocol }} { namespace v{{ version }} {
+{%- endif %}
+
+{%- if schema.get('enums') %}
+
+// Enums
+{% for enum_name, enum_values in schema.get('enums', {}).items() %}
+enum class {{ enum_name }} : uint32_t {
+{%- for value_name, value_num in enum_values.items() %}
+    {{ value_name }} = {{ value_num }},
+{%- endfor %}
 };
 
 {% endfor %}
-{% for ns in namespace.split('::') %}
-}  // namespace {{ ns }}
+{%- endif %}
+
+{%- macro map_type(field) -%}
+{%- if field.type == 'u8' -%}uint8_t
+{%- elif field.type == 'u16' -%}uint16_t
+{%- elif field.type == 'u32' -%}uint32_t
+{%- elif field.type == 'u64' -%}uint64_t
+{%- elif field.type == 'char' and field.get('length') -%}std::array<char, {{ field.length }}>
+{%- elif field.type == 'char' -%}char
+{%- elif field.type == 'enum' -%}{{ field.enum_type }}
+{%- else -%}{{ field.type }}
+{%- endif -%}
+{%- endmacro %}
+
+{%- if schema.get('messages') %}
+
+// Group structures
+{% for message_name, message_def in schema.get('messages', {}).items() %}
+{%- if message_def.get('groups') %}
+{%- for group in message_def.get('groups', []) %}
+struct {{ message_name }}{{ group.name }} {
+{%- for field in group.get('fields', []) %}
+    {{ map_type(field) }} {{ field.name }}{};
+{%- endfor %}
+};
+
 {% endfor %}
+{%- endif %}
+{% endfor %}
+
+// Message structures
+{% for message_name, message_def in schema.get('messages', {}).items() %}
+struct {{ message_name }} {
+{%- for field in message_def.get('fields', []) %}
+    {{ map_type(field) }} {{ field.name }}{};
+{%- endfor %}
+{%- if message_def.get('groups') %}
+{%- for group in message_def.get('groups', []) %}
+    std::vector<{{ message_name }}{{ group.name }}> {{ group.name.lower() }};
+{%- endfor %}
+{%- endif %}
+};
+
+{% endfor %}
+{%- endif %}
+
+{%- if ns_parts|length > 1 %}
+}  // namespace v{{ version }}
+}  // namespace {{ ns_parts[1] }}
+}  // namespace {{ ns_parts[0] }}
+{%- else %}
+}  // namespace v{{ version }}
+}  // namespace {{ protocol }}
+{%- endif %}
