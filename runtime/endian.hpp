@@ -77,4 +77,4 @@ inline void store_be(uint8_t* p, T v) noexcept {
     std::memcpy(p, &v, sizeof(T));
 }
 
-}  // namespace market::runtime
+}

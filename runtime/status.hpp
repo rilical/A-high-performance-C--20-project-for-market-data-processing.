@@ -9,4 +9,4 @@ enum class status {
     unknown_type
 };
 
-}  // namespace market::runtime
+}

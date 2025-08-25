@@ -1,0 +1,59 @@
+protocol: cboe_boe
+version: 3
+
+enums:
+  MessageType:
+    LoginRequest: 0x01
+    NewOrderCross: 0x41
+  Side:
+    Buy: 0x01
+    Sell: 0x02
+
+messages:
+  LoginRequest:
+    fields:
+      - name: StartOfMessage
+        type: u16
+        endian: le
+        value: 0xBABA
+      - name: MessageLength
+        type: u16
+        endian: le
+      - name: MessageType
+        type: enum
+        enum_type: MessageType
+      - name: Username
+        type: char
+        length: 4
+      - name: Password
+        type: char
+        length: 20
+
+  NewOrderCross:
+    fields:
+      - name: PresenceBits
+        type: u64
+        endian: le
+        purpose: presence_map
+      - name: CrossId
+        type: char
+        length: 20
+      - name: GroupCount
+        type: u8
+    groups:
+      - name: Groups
+        count_field: GroupCount
+        fields:
+          - name: Side
+            type: u8
+            enum_type: Side
+          - name: AllocQty
+            type: u32
+            endian: le
+          - name: ClOrdId
+            type: char
+            length: 20
+          - name: Account
+            type: char
+            length: 16
+            optional_bit: 9

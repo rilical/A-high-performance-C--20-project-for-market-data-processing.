@@ -1,0 +1,38 @@
+protocol: nasdaq_itch
+version: 5
+
+messages:
+  AddOrder:
+    fields:
+      - name: Type
+        type: char
+        value: 'A'
+      - name: Timestamp
+        type: u32
+        endian: be
+      - name: OrderId
+        type: u64
+        endian: be
+      - name: Side
+        type: char
+      - name: Shares
+        type: u32
+        endian: be
+      - name: Symbol
+        type: char
+        length: 8
+      - name: Price
+        type: u32
+        endian: be
+
+  DeleteOrder:
+    fields:
+      - name: Type
+        type: char
+        value: 'D'
+      - name: Timestamp
+        type: u32
+        endian: be
+      - name: OrderId
+        type: u64
+        endian: be
