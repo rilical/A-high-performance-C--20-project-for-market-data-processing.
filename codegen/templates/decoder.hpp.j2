@@ -3,15 +3,34 @@
 #pragma once
 
 #include "messages.hpp"
+#include "../../runtime/status.hpp"
+#include "../../runtime/endian.hpp"
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 
-namespace {{ namespace.replace('::', ' { namespace ') }} {
+{%- set ns_parts = protocol.split('_') %}
+{%- if ns_parts|length > 1 %}
+
+namespace {{ ns_parts[0] }} { namespace {{ ns_parts[1] }} { namespace v{{ version }} {
+{%- else %}
+
+namespace {{ protocol }} { namespace v{{ version }} {
+{%- endif %}
 
 // Decoder for {{ protocol }} v{{ version }}
 class Decoder {
 public:
-    // TODO: Generated decoder methods
+{%- if schema.get('messages', {}).get('LoginRequest') %}
+    static market::runtime::status decode(const uint8_t* in, size_t in_sz, LoginRequest& out, size_t& consumed);
+{%- endif %}
 };
 
-{% for ns in namespace.split('::') %}
-}  // namespace {{ ns }}
-{% endfor %}
+{%- if ns_parts|length > 1 %}
+}  // namespace v{{ version }}
+}  // namespace {{ ns_parts[1] }}
+}  // namespace {{ ns_parts[0] }}
+{%- else %}
+}  // namespace v{{ version }}
+}  // namespace {{ protocol }}
+{%- endif %}

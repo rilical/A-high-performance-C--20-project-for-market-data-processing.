@@ -2,4 +2,58 @@
 
 #include "encoder.hpp"
 
-// Implementation stub for {{ protocol }} v{{ version }} encoder
+{%- set ns_parts = protocol.split('_') %}
+{%- if ns_parts|length > 1 %}
+
+namespace {{ ns_parts[0] }} { namespace {{ ns_parts[1] }} { namespace v{{ version }} {
+{%- else %}
+
+namespace {{ protocol }} { namespace v{{ version }} {
+{%- endif %}
+
+{%- if schema.get('messages', {}).get('LoginRequest') %}
+
+market::runtime::status Encoder::encode(const LoginRequest& m, uint8_t* out, size_t out_sz, size_t& written) {
+    constexpr size_t TOTAL_SIZE = 2 + 2 + 1 + 4 + 20; // StartOfMessage + MessageLength + MessageType + Username + Password
+    
+    if (out_sz < TOTAL_SIZE) {
+        written = 0;
+        return market::runtime::status::short_buffer;
+    }
+    
+    size_t offset = 0;
+    
+    // StartOfMessage (u16 LE, fixed value 0xBABA)
+    market::runtime::store_le<uint16_t>(out + offset, 0xBABA);
+    offset += 2;
+    
+    // MessageLength (u16 LE, total message size)
+    market::runtime::store_le<uint16_t>(out + offset, static_cast<uint16_t>(TOTAL_SIZE));
+    offset += 2;
+    
+    // MessageType (u8, LoginRequest enum value)
+    out[offset] = static_cast<uint8_t>(MessageType::LoginRequest);
+    offset += 1;
+    
+    // Username (char[4])
+    std::memcpy(out + offset, m.Username.data(), 4);
+    offset += 4;
+    
+    // Password (char[20])
+    std::memcpy(out + offset, m.Password.data(), 20);
+    offset += 20;
+    
+    written = TOTAL_SIZE;
+    return market::runtime::status::ok;
+}
+
+{%- endif %}
+
+{%- if ns_parts|length > 1 %}
+}  // namespace v{{ version }}
+}  // namespace {{ ns_parts[1] }}
+}  // namespace {{ ns_parts[0] }}
+{%- else %}
+}  // namespace v{{ version }}
+}  // namespace {{ protocol }}
+{%- endif %}
