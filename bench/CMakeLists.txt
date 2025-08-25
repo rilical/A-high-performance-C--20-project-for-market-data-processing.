@@ -1,0 +1,1 @@
+add_executable(bench_encode_decode bench_encode_decode.cpp)
