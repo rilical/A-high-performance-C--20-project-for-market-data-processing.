@@ -14,6 +14,267 @@ def generate_namespace(protocol, version):
     return namespace
 
 
+def validate_schema(schema, schema_path):
+    """Validate schema structure and content with precise error reporting."""
+    
+    def error(path, message):
+        raise ValueError(f"Schema validation error at {path}: {message}")
+    
+    # Check top-level structure
+    if not isinstance(schema, dict):
+        error("root", "Schema must be a dictionary")
+    
+    # Required top-level keys
+    if 'protocol' not in schema:
+        error("root", "Missing required field 'protocol'")
+    if not isinstance(schema['protocol'], str):
+        error("protocol", "Must be a string")
+    
+    if 'version' not in schema:
+        error("root", "Missing required field 'version'")
+    if not isinstance(schema['version'], (int, str)):
+        error("version", "Must be an integer or string")
+    
+    if 'messages' not in schema:
+        error("root", "Missing required field 'messages'")
+    if not isinstance(schema['messages'], dict):
+        error("messages", "Must be a dictionary")
+    
+    # Validate enums if present
+    enums = schema.get('enums', {})
+    if not isinstance(enums, dict):
+        error("enums", "Must be a dictionary")
+    
+    # Check enum name uniqueness and value types
+    enum_names = set()
+    for enum_name, enum_def in enums.items():
+        if enum_name in enum_names:
+            error(f"enums.{enum_name}", "Duplicate enum name")
+        enum_names.add(enum_name)
+        
+        if not isinstance(enum_def, dict):
+            error(f"enums.{enum_name}", "Enum definition must be a dictionary")
+        
+        enum_values = set()
+        for value_name, value in enum_def.items():
+            if not isinstance(value, (int, str)):
+                error(f"enums.{enum_name}.{value_name}", "Enum value must be integer or hex string")
+            if isinstance(value, str) and not (value.startswith('0x') or value.startswith('0X')):
+                error(f"enums.{enum_name}.{value_name}", "String enum values must be hex (0x...)")
+            if value in enum_values:
+                error(f"enums.{enum_name}.{value_name}", "Duplicate enum value")
+            enum_values.add(value)
+    
+    # Validate groups if present
+    groups = schema.get('groups', {})
+    if not isinstance(groups, dict):
+        error("groups", "Must be a dictionary")
+    
+    # Validate type syntax
+    def validate_type(field, path):
+        type_str = field['type']
+        if type_str in ['u8', 'u16', 'u32', 'u64']:
+            return
+        if type_str == 'char':
+            # Check for length field for char arrays
+            if 'length' in field:
+                try:
+                    length = int(field['length'])
+                    if length <= 0:
+                        error(path, f"char length must be > 0, got {length}")
+                except (ValueError, TypeError):
+                    error(path, f"Invalid char length: {field['length']}")
+            return
+        if type_str.startswith('char[') and type_str.endswith(']'):
+            try:
+                size = int(type_str[5:-1])
+                if size <= 0:
+                    error(path, f"char array size must be > 0, got {size}")
+                return
+            except ValueError:
+                error(path, f"Invalid char array size in '{type_str}'")
+        if type_str == 'enum':
+            # Check for enum_type field
+            if 'enum_type' in field:
+                enum_name = field['enum_type']
+                if enum_name not in enum_names:
+                    error(path, f"Referenced enum '{enum_name}' does not exist")
+            else:
+                error(path, "enum type must specify enum_type field")
+            return
+        if type_str.startswith('enum:'):
+            enum_name = type_str[5:]
+            if enum_name not in enum_names:
+                error(path, f"Referenced enum '{enum_name}' does not exist")
+            return
+        error(path, f"Invalid type '{type_str}'. Allowed: u8/u16/u32/u64, char, char[N], enum:Name, or enum with enum_type")
+    
+    # Validate endianness if present
+    def validate_endianness(endian_str, path):
+        if endian_str not in ['le', 'be']:
+            error(path, f"Invalid endianness '{endian_str}'. Must be 'le' or 'be'")
+    
+    # Get presence map width from type
+    def get_presence_map_width(type_str):
+        type_widths = {'u8': 8, 'u16': 16, 'u32': 32, 'u64': 64}
+        return type_widths.get(type_str, 0)
+    
+    # Validate group definitions
+    for group_name, group_def in groups.items():
+        if not isinstance(group_def, dict):
+            error(f"groups.{group_name}", "Group definition must be a dictionary")
+        
+        if 'fields' not in group_def:
+            error(f"groups.{group_name}", "Group must have 'fields' list")
+        
+        fields = group_def['fields']
+        if not isinstance(fields, list):
+            error(f"groups.{group_name}.fields", "Must be a list")
+        
+        field_names = set()
+        for i, field in enumerate(fields):
+            if not isinstance(field, dict):
+                error(f"groups.{group_name}.fields[{i}]", "Field must be a dictionary")
+            
+            if 'name' not in field:
+                error(f"groups.{group_name}.fields[{i}]", "Field must have 'name'")
+            field_name = field['name']
+            
+            if field_name in field_names:
+                error(f"groups.{group_name}.fields[{i}].name", f"Duplicate field name '{field_name}'")
+            field_names.add(field_name)
+            
+            if 'type' not in field:
+                error(f"groups.{group_name}.fields[{i}]", "Field must have 'type'")
+            
+            validate_type(field, f"groups.{group_name}.fields[{i}].type")
+            
+            if 'endian' in field:
+                validate_endianness(field['endian'], f"groups.{group_name}.fields[{i}].endian")
+    
+    # Validate messages
+    for message_name, message_def in schema['messages'].items():
+        if not isinstance(message_def, dict):
+            error(f"messages.{message_name}", "Message definition must be a dictionary")
+        
+        if 'fields' not in message_def:
+            error(f"messages.{message_name}", "Message must have 'fields' list")
+        
+        fields = message_def['fields']
+        if not isinstance(fields, list):
+            error(f"messages.{message_name}.fields", "Must be a list")
+        
+        field_names = set()
+        presence_map_field = None
+        presence_map_width = 0
+        
+        # First pass: find presence map and validate basic structure
+        for i, field in enumerate(fields):
+            if not isinstance(field, dict):
+                error(f"messages.{message_name}.fields[{i}]", "Field must be a dictionary")
+            
+            if 'name' not in field:
+                error(f"messages.{message_name}.fields[{i}]", "Field must have 'name'")
+            field_name = field['name']
+            
+            if field_name in field_names:
+                error(f"messages.{message_name}.fields[{i}].name", f"Duplicate field name '{field_name}'")
+            field_names.add(field_name)
+            
+            # Check for presence map
+            if field.get('purpose') == 'presence_map':
+                if presence_map_field is not None:
+                    error(f"messages.{message_name}.fields[{i}]", "Multiple presence map fields found")
+                presence_map_field = field_name
+                if 'type' not in field:
+                    error(f"messages.{message_name}.fields[{i}]", "Presence map field must have 'type'")
+                presence_map_width = get_presence_map_width(field['type'])
+                if presence_map_width == 0:
+                    error(f"messages.{message_name}.fields[{i}].type", f"Invalid presence map type '{field['type']}'. Must be u8/u16/u32/u64")
+        
+        # Second pass: validate field types and optional_bit
+        for i, field in enumerate(fields):
+            field_name = field['name']
+            
+            # Handle groups section in message (groups defined inline)
+            if field_name == 'groups' and 'groups' in message_def:
+                # Skip validation for now - this is handled by message-level groups
+                continue
+            
+            else:
+                # Regular field - validate type
+                if 'type' not in field:
+                    error(f"messages.{message_name}.fields[{i}]", "Field must have 'type'")
+                
+                validate_type(field, f"messages.{message_name}.fields[{i}].type")
+                
+                if 'endian' in field:
+                    validate_endianness(field['endian'], f"messages.{message_name}.fields[{i}].endian")
+                
+                # Validate optional_bit
+                if 'optional_bit' in field:
+                    optional_bit = field['optional_bit']
+                    if not isinstance(optional_bit, int) or optional_bit < 0:
+                        error(f"messages.{message_name}.fields[{i}].optional_bit", "Must be a non-negative integer")
+                    if optional_bit >= presence_map_width:
+                        error(f"messages.{message_name}.fields[{i}].optional_bit", f"optional_bit {optional_bit} exceeds presence map width {presence_map_width}")
+                    if presence_map_field is None:
+                        error(f"messages.{message_name}.fields[{i}].optional_bit", "optional_bit specified but no presence map found in message")
+        
+        # Validate message-level groups if present
+        if 'groups' in message_def:
+            message_groups = message_def['groups']
+            if not isinstance(message_groups, list):
+                error(f"messages.{message_name}.groups", "Must be a list")
+            
+            for group_idx, group in enumerate(message_groups):
+                if not isinstance(group, dict):
+                    error(f"messages.{message_name}.groups[{group_idx}]", "Group must be a dictionary")
+                
+                if 'name' not in group:
+                    error(f"messages.{message_name}.groups[{group_idx}]", "Group must have 'name'")
+                
+                if 'count_field' in group:
+                    count_field = group['count_field']
+                    if count_field not in field_names:
+                        error(f"messages.{message_name}.groups[{group_idx}].count_field", f"Count field '{count_field}' not found in message fields")
+                
+                if 'fields' in group:
+                    group_fields = group['fields']
+                    if not isinstance(group_fields, list):
+                        error(f"messages.{message_name}.groups[{group_idx}].fields", "Must be a list")
+                    
+                    group_field_names = set()
+                    for field_idx, group_field in enumerate(group_fields):
+                        if not isinstance(group_field, dict):
+                            error(f"messages.{message_name}.groups[{group_idx}].fields[{field_idx}]", "Field must be a dictionary")
+                        
+                        if 'name' not in group_field:
+                            error(f"messages.{message_name}.groups[{group_idx}].fields[{field_idx}]", "Field must have 'name'")
+                        
+                        group_field_name = group_field['name']
+                        if group_field_name in group_field_names:
+                            error(f"messages.{message_name}.groups[{group_idx}].fields[{field_idx}].name", f"Duplicate field name '{group_field_name}'")
+                        group_field_names.add(group_field_name)
+                        
+                        if 'type' not in group_field:
+                            error(f"messages.{message_name}.groups[{group_idx}].fields[{field_idx}]", "Field must have 'type'")
+                        
+                        validate_type(group_field, f"messages.{message_name}.groups[{group_idx}].fields[{field_idx}].type")
+                        
+                        if 'endian' in group_field:
+                            validate_endianness(group_field['endian'], f"messages.{message_name}.groups[{group_idx}].fields[{field_idx}].endian")
+                        
+                        # Validate optional_bit for group fields
+                        if 'optional_bit' in group_field:
+                            optional_bit = group_field['optional_bit']
+                            if not isinstance(optional_bit, int) or optional_bit < 0:
+                                error(f"messages.{message_name}.groups[{group_idx}].fields[{field_idx}].optional_bit", "Must be a non-negative integer")
+                            if optional_bit >= presence_map_width:
+                                error(f"messages.{message_name}.groups[{group_idx}].fields[{field_idx}].optional_bit", f"optional_bit {optional_bit} exceeds presence map width {presence_map_width}")
+                            if presence_map_field is None:
+                                error(f"messages.{message_name}.groups[{group_idx}].fields[{field_idx}].optional_bit", "optional_bit specified but no presence map found in message")
+
 def main():
     parser = argparse.ArgumentParser(description='Generate C++ code from YAML schema')
     parser.add_argument('--schema', required=True, help='Input YAML schema file')
@@ -27,6 +288,14 @@ def main():
             schema = yaml.safe_load(f)
     except Exception as e:
         print(f"Error reading schema: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Validate schema
+    try:
+        validate_schema(schema, args.schema)
+        print(f"Schema OK: {args.schema}")
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     
     # Extract protocol info
