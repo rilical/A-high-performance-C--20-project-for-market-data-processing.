@@ -92,6 +92,173 @@ int main() {
         return 1;
     }
     
+    // Test NewOrderCross without optional Account fields (PresenceBits=0)
+    {
+        NewOrderCross original;
+        original.PresenceBits = 0; // No optional fields
+        std::memcpy(original.CrossId.data(), "CROSS123456789012345", 20);
+        
+        // Add 2 groups without Account
+        original.groups.clear();
+        original.groups.reserve(2);
+        
+        NewOrderCrossGroups group1;
+        group1.Side = static_cast<uint8_t>(Side::Buy);
+        group1.AllocQty = 1000;
+        std::memcpy(group1.ClOrdId.data(), "ORDER1234567890123456", 20);
+        std::memset(group1.Account.data(), 0, 16); // Clear Account
+        original.groups.push_back(group1);
+        
+        NewOrderCrossGroups group2;
+        group2.Side = static_cast<uint8_t>(Side::Sell);
+        group2.AllocQty = 2000;
+        std::memcpy(group2.ClOrdId.data(), "ORDER2345678901234567", 20);
+        std::memset(group2.Account.data(), 0, 16); // Clear Account
+        original.groups.push_back(group2);
+        
+        original.GroupCount = static_cast<uint8_t>(original.groups.size());
+        
+        // Encode to first buffer
+        std::array<uint8_t, 256> buffer1{};
+        size_t written1 = 0;
+        auto status1 = Encoder::encode(original, buffer1.data(), buffer1.size(), written1);
+        
+        if (status1 != market::runtime::status::ok) {
+            std::cerr << "NewOrderCross encode failed (no Account)" << std::endl;
+            return 1;
+        }
+        
+        // Decode back to new struct
+        NewOrderCross decoded;
+        size_t consumed = 0;
+        auto status2 = Decoder::decode(buffer1.data(), written1, decoded, consumed);
+        
+        if (status2 != market::runtime::status::ok) {
+            std::cerr << "NewOrderCross decode failed (no Account)" << std::endl;
+            return 1;
+        }
+        
+        if (consumed != written1) {
+            std::cerr << "NewOrderCross consumed bytes mismatch" << std::endl;
+            return 1;
+        }
+        
+        if (decoded.groups.size() != 2) {
+            std::cerr << "NewOrderCross decoded group count != 2" << std::endl;
+            return 1;
+        }
+        
+        // Re-encode decoded struct
+        std::array<uint8_t, 256> buffer2{};
+        size_t written2 = 0;
+        auto status3 = Encoder::encode(decoded, buffer2.data(), buffer2.size(), written2);
+        
+        if (status3 != market::runtime::status::ok) {
+            std::cerr << "NewOrderCross second encode failed (no Account)" << std::endl;
+            return 1;
+        }
+        
+        // Verify byte-for-byte equality
+        if (written1 != written2) {
+            std::cerr << "NewOrderCross encoded sizes differ: " << written1 << " vs " << written2 << std::endl;
+            return 1;
+        }
+        
+        if (std::memcmp(buffer1.data(), buffer2.data(), written1) != 0) {
+            std::cerr << "NewOrderCross encoded bytes differ" << std::endl;
+            return 1;
+        }
+    }
+    
+    // Test NewOrderCross with optional Account fields (PresenceBits bit 9 set)
+    {
+        NewOrderCross original;
+        original.PresenceBits = (1ULL << 9); // Include Account fields
+        std::memcpy(original.CrossId.data(), "CROSS234567890123456", 20);
+        
+        // Add 2 groups with Account
+        original.groups.clear();
+        original.groups.reserve(2);
+        
+        NewOrderCrossGroups group1;
+        group1.Side = static_cast<uint8_t>(Side::Buy);
+        group1.AllocQty = 1500;
+        std::memcpy(group1.ClOrdId.data(), "ORDER3456789012345678", 20);
+        std::memcpy(group1.Account.data(), "ACCOUNT123456789", 16);
+        original.groups.push_back(group1);
+        
+        NewOrderCrossGroups group2;
+        group2.Side = static_cast<uint8_t>(Side::Sell);
+        group2.AllocQty = 2500;
+        std::memcpy(group2.ClOrdId.data(), "ORDER4567890123456789", 20);
+        std::memcpy(group2.Account.data(), "ACCOUNT234567890", 16);
+        original.groups.push_back(group2);
+        
+        original.GroupCount = static_cast<uint8_t>(original.groups.size());
+        
+        // Encode to first buffer
+        std::array<uint8_t, 256> buffer1{};
+        size_t written1 = 0;
+        auto status1 = Encoder::encode(original, buffer1.data(), buffer1.size(), written1);
+        
+        if (status1 != market::runtime::status::ok) {
+            std::cerr << "NewOrderCross encode failed (with Account)" << std::endl;
+            return 1;
+        }
+        
+        // Decode back to new struct
+        NewOrderCross decoded;
+        size_t consumed = 0;
+        auto status2 = Decoder::decode(buffer1.data(), written1, decoded, consumed);
+        
+        if (status2 != market::runtime::status::ok) {
+            std::cerr << "NewOrderCross decode failed (with Account)" << std::endl;
+            return 1;
+        }
+        
+        if (consumed != written1) {
+            std::cerr << "NewOrderCross consumed bytes mismatch (with Account)" << std::endl;
+            return 1;
+        }
+        
+        if (decoded.groups.size() != 2) {
+            std::cerr << "NewOrderCross decoded group count != 2 (with Account)" << std::endl;
+            return 1;
+        }
+        
+        // Verify Account fields were preserved
+        if (std::memcmp(decoded.groups[0].Account.data(), "ACCOUNT123456789", 16) != 0) {
+            std::cerr << "NewOrderCross Account[0] mismatch" << std::endl;
+            return 1;
+        }
+        
+        if (std::memcmp(decoded.groups[1].Account.data(), "ACCOUNT234567890", 16) != 0) {
+            std::cerr << "NewOrderCross Account[1] mismatch" << std::endl;
+            return 1;
+        }
+        
+        // Re-encode decoded struct
+        std::array<uint8_t, 256> buffer2{};
+        size_t written2 = 0;
+        auto status3 = Encoder::encode(decoded, buffer2.data(), buffer2.size(), written2);
+        
+        if (status3 != market::runtime::status::ok) {
+            std::cerr << "NewOrderCross second encode failed (with Account)" << std::endl;
+            return 1;
+        }
+        
+        // Verify byte-for-byte equality
+        if (written1 != written2) {
+            std::cerr << "NewOrderCross encoded sizes differ (with Account): " << written1 << " vs " << written2 << std::endl;
+            return 1;
+        }
+        
+        if (std::memcmp(buffer1.data(), buffer2.data(), written1) != 0) {
+            std::cerr << "NewOrderCross encoded bytes differ (with Account)" << std::endl;
+            return 1;
+        }
+    }
+    
     // Test passes - no output on success
     return 0;
 #else
