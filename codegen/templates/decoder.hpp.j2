@@ -27,6 +27,12 @@ public:
 {%- if schema.get('messages', {}).get('NewOrderCross') %}
     static market::runtime::status decode(const uint8_t* in, size_t in_sz, NewOrderCross& out, size_t& consumed);
 {%- endif %}
+{%- if schema.get('messages', {}).get('AddOrder') %}
+    static market::runtime::status decode(const uint8_t* in, size_t in_sz, AddOrder& out, size_t& consumed);
+{%- endif %}
+{%- if schema.get('messages', {}).get('DeleteOrder') %}
+    static market::runtime::status decode(const uint8_t* in, size_t in_sz, DeleteOrder& out, size_t& consumed);
+{%- endif %}
 };
 
 {%- if ns_parts|length > 1 %}

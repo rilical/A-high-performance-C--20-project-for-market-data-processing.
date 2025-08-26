@@ -8,6 +8,13 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/generated/cboe_boe_v3/encoder.cpp")
     )
 endif()
 
+if(EXISTS "${CMAKE_SOURCE_DIR}/generated/nasdaq_itch_5/encoder.cpp")
+    list(APPEND TEST_SOURCES 
+        "${CMAKE_SOURCE_DIR}/generated/nasdaq_itch_5/encoder.cpp"
+        "${CMAKE_SOURCE_DIR}/generated/nasdaq_itch_5/decoder.cpp"
+    )
+endif()
+
 add_executable(test_roundtrip ${TEST_SOURCES})
 
 include(CTest)

@@ -121,6 +121,82 @@ market::runtime::status Encoder::encode(const NewOrderCross& m, uint8_t* out, si
 
 {%- endif %}
 
+{%- if schema.get('messages', {}).get('AddOrder') %}
+
+market::runtime::status Encoder::encode(const AddOrder& m, uint8_t* out, size_t out_sz, size_t& written) {
+    constexpr size_t TOTAL_SIZE = 1 + 4 + 8 + 1 + 4 + 8 + 4; // Type + Timestamp + OrderId + Side + Shares + Symbol + Price
+    
+    if (out_sz < TOTAL_SIZE) {
+        written = 0;
+        return market::runtime::status::short_buffer;
+    }
+    
+    size_t offset = 0;
+    
+    // Type (char, fixed value 'A')
+    out[offset] = 'A';
+    offset += 1;
+    
+    // Timestamp (u32 BE)
+    market::runtime::store_be<uint32_t>(out + offset, m.Timestamp);
+    offset += 4;
+    
+    // OrderId (u64 BE)
+    market::runtime::store_be<uint64_t>(out + offset, m.OrderId);
+    offset += 8;
+    
+    // Side (char)
+    out[offset] = m.Side;
+    offset += 1;
+    
+    // Shares (u32 BE)
+    market::runtime::store_be<uint32_t>(out + offset, m.Shares);
+    offset += 4;
+    
+    // Symbol (char[8])
+    std::memcpy(out + offset, m.Symbol.data(), 8);
+    offset += 8;
+    
+    // Price (u32 BE)
+    market::runtime::store_be<uint32_t>(out + offset, m.Price);
+    offset += 4;
+    
+    written = TOTAL_SIZE;
+    return market::runtime::status::ok;
+}
+
+{%- endif %}
+
+{%- if schema.get('messages', {}).get('DeleteOrder') %}
+
+market::runtime::status Encoder::encode(const DeleteOrder& m, uint8_t* out, size_t out_sz, size_t& written) {
+    constexpr size_t TOTAL_SIZE = 1 + 4 + 8; // Type + Timestamp + OrderId
+    
+    if (out_sz < TOTAL_SIZE) {
+        written = 0;
+        return market::runtime::status::short_buffer;
+    }
+    
+    size_t offset = 0;
+    
+    // Type (char, fixed value 'D')
+    out[offset] = 'D';
+    offset += 1;
+    
+    // Timestamp (u32 BE)
+    market::runtime::store_be<uint32_t>(out + offset, m.Timestamp);
+    offset += 4;
+    
+    // OrderId (u64 BE)
+    market::runtime::store_be<uint64_t>(out + offset, m.OrderId);
+    offset += 8;
+    
+    written = TOTAL_SIZE;
+    return market::runtime::status::ok;
+}
+
+{%- endif %}
+
 {%- if ns_parts|length > 1 %}
 }  // namespace v{{ version }}
 }  // namespace {{ ns_parts[1] }}

@@ -14,6 +14,19 @@
 #define HAS_GENERATED_BOE 0
 #endif
 
+#if __has_include("../generated/nasdaq_itch_5/messages.hpp")
+#include "../generated/nasdaq_itch_5/messages.hpp"
+#include "../generated/nasdaq_itch_5/encoder.hpp"
+#include "../generated/nasdaq_itch_5/decoder.hpp"
+#ifndef HAS_INCLUDED_STATUS
+#include "../runtime/status.hpp"
+#define HAS_INCLUDED_STATUS 1
+#endif
+#define HAS_GENERATED_ITCH 1
+#else
+#define HAS_GENERATED_ITCH 0
+#endif
+
 int main() {
 #if HAS_GENERATED_BOE
     using namespace cboe::boe::v3;
@@ -121,7 +134,7 @@ int main() {
         // Encode to first buffer
         std::array<uint8_t, 256> buffer1{};
         size_t written1 = 0;
-        auto status1 = Encoder::encode(original, buffer1.data(), buffer1.size(), written1);
+        auto status1 = nasdaq::itch::v5::Encoder::encode(original, buffer1.data(), buffer1.size(), written1);
         
         if (status1 != market::runtime::status::ok) {
             std::cerr << "NewOrderCross encode failed (no Account)" << std::endl;
@@ -131,7 +144,7 @@ int main() {
         // Decode back to new struct
         NewOrderCross decoded;
         size_t consumed = 0;
-        auto status2 = Decoder::decode(buffer1.data(), written1, decoded, consumed);
+        auto status2 = nasdaq::itch::v5::Decoder::decode(buffer1.data(), written1, decoded, consumed);
         
         if (status2 != market::runtime::status::ok) {
             std::cerr << "NewOrderCross decode failed (no Account)" << std::endl;
@@ -151,7 +164,7 @@ int main() {
         // Re-encode decoded struct
         std::array<uint8_t, 256> buffer2{};
         size_t written2 = 0;
-        auto status3 = Encoder::encode(decoded, buffer2.data(), buffer2.size(), written2);
+        auto status3 = nasdaq::itch::v5::Encoder::encode(decoded, buffer2.data(), buffer2.size(), written2);
         
         if (status3 != market::runtime::status::ok) {
             std::cerr << "NewOrderCross second encode failed (no Account)" << std::endl;
@@ -199,7 +212,7 @@ int main() {
         // Encode to first buffer
         std::array<uint8_t, 256> buffer1{};
         size_t written1 = 0;
-        auto status1 = Encoder::encode(original, buffer1.data(), buffer1.size(), written1);
+        auto status1 = nasdaq::itch::v5::Encoder::encode(original, buffer1.data(), buffer1.size(), written1);
         
         if (status1 != market::runtime::status::ok) {
             std::cerr << "NewOrderCross encode failed (with Account)" << std::endl;
@@ -209,7 +222,7 @@ int main() {
         // Decode back to new struct
         NewOrderCross decoded;
         size_t consumed = 0;
-        auto status2 = Decoder::decode(buffer1.data(), written1, decoded, consumed);
+        auto status2 = nasdaq::itch::v5::Decoder::decode(buffer1.data(), written1, decoded, consumed);
         
         if (status2 != market::runtime::status::ok) {
             std::cerr << "NewOrderCross decode failed (with Account)" << std::endl;
@@ -240,7 +253,7 @@ int main() {
         // Re-encode decoded struct
         std::array<uint8_t, 256> buffer2{};
         size_t written2 = 0;
-        auto status3 = Encoder::encode(decoded, buffer2.data(), buffer2.size(), written2);
+        auto status3 = nasdaq::itch::v5::Encoder::encode(decoded, buffer2.data(), buffer2.size(), written2);
         
         if (status3 != market::runtime::status::ok) {
             std::cerr << "NewOrderCross second encode failed (with Account)" << std::endl;
@@ -259,10 +272,151 @@ int main() {
         }
     }
     
+#endif
+
+#if HAS_GENERATED_ITCH
+    // Test ITCH AddOrder round-trip
+    {
+        using namespace nasdaq::itch::v5;
+        
+        AddOrder original;
+        original.Type = 'A';
+        original.Timestamp = 123456u;
+        original.OrderId = 0x0102030405060708ULL;
+        original.Side = 'B';
+        original.Shares = 1000u;
+        std::memcpy(original.Symbol.data(), "ABCDEF  ", 8); // 8 chars with spaces
+        original.Price = 123450u;
+        
+        // Encode to first buffer
+        std::array<uint8_t, 64> buffer1{};
+        size_t written1 = 0;
+        auto status1 = nasdaq::itch::v5::Encoder::encode(original, buffer1.data(), buffer1.size(), written1);
+        
+        if (status1 != market::runtime::status::ok) {
+            std::cerr << "ITCH AddOrder encode failed" << std::endl;
+            return 1;
+        }
+        
+        // Verify expected size (1 + 4 + 8 + 1 + 4 + 8 + 4 = 30 bytes)
+        if (written1 != 30) {
+            std::cerr << "ITCH AddOrder unexpected size: " << written1 << std::endl;
+            return 1;
+        }
+        
+        // Decode back to new struct
+        AddOrder decoded;
+        size_t consumed = 0;
+        auto status2 = nasdaq::itch::v5::Decoder::decode(buffer1.data(), written1, decoded, consumed);
+        
+        if (status2 != market::runtime::status::ok) {
+            std::cerr << "ITCH AddOrder decode failed" << std::endl;
+            return 1;
+        }
+        
+        if (consumed != written1) {
+            std::cerr << "ITCH AddOrder consumed bytes mismatch" << std::endl;
+            return 1;
+        }
+        
+        // Verify Type field
+        if (decoded.Type != 'A') {
+            std::cerr << "ITCH AddOrder decoded Type != 'A'" << std::endl;
+            return 1;
+        }
+        
+        // Re-encode decoded struct
+        std::array<uint8_t, 64> buffer2{};
+        size_t written2 = 0;
+        auto status3 = nasdaq::itch::v5::Encoder::encode(decoded, buffer2.data(), buffer2.size(), written2);
+        
+        if (status3 != market::runtime::status::ok) {
+            std::cerr << "ITCH AddOrder second encode failed" << std::endl;
+            return 1;
+        }
+        
+        // Verify byte-for-byte equality
+        if (written1 != written2) {
+            std::cerr << "ITCH AddOrder encoded sizes differ: " << written1 << " vs " << written2 << std::endl;
+            return 1;
+        }
+        
+        if (std::memcmp(buffer1.data(), buffer2.data(), written1) != 0) {
+            std::cerr << "ITCH AddOrder encoded bytes differ" << std::endl;
+            return 1;
+        }
+    }
+    
+    // Test ITCH DeleteOrder round-trip
+    {
+        using namespace nasdaq::itch::v5;
+        
+        DeleteOrder original;
+        original.Type = 'D';
+        original.Timestamp = 654321u;
+        original.OrderId = 0x0908070605040302ULL;
+        
+        // Encode to first buffer
+        std::array<uint8_t, 64> buffer1{};
+        size_t written1 = 0;
+        auto status1 = nasdaq::itch::v5::Encoder::encode(original, buffer1.data(), buffer1.size(), written1);
+        
+        if (status1 != market::runtime::status::ok) {
+            std::cerr << "ITCH DeleteOrder encode failed" << std::endl;
+            return 1;
+        }
+        
+        // Verify expected size (1 + 4 + 8 = 13 bytes)
+        if (written1 != 13) {
+            std::cerr << "ITCH DeleteOrder unexpected size: " << written1 << std::endl;
+            return 1;
+        }
+        
+        // Decode back to new struct
+        DeleteOrder decoded;
+        size_t consumed = 0;
+        auto status2 = nasdaq::itch::v5::Decoder::decode(buffer1.data(), written1, decoded, consumed);
+        
+        if (status2 != market::runtime::status::ok) {
+            std::cerr << "ITCH DeleteOrder decode failed" << std::endl;
+            return 1;
+        }
+        
+        if (consumed != written1) {
+            std::cerr << "ITCH DeleteOrder consumed bytes mismatch" << std::endl;
+            return 1;
+        }
+        
+        // Verify Type field
+        if (decoded.Type != 'D') {
+            std::cerr << "ITCH DeleteOrder decoded Type != 'D'" << std::endl;
+            return 1;
+        }
+        
+        // Re-encode decoded struct
+        std::array<uint8_t, 64> buffer2{};
+        size_t written2 = 0;
+        auto status3 = nasdaq::itch::v5::Encoder::encode(decoded, buffer2.data(), buffer2.size(), written2);
+        
+        if (status3 != market::runtime::status::ok) {
+            std::cerr << "ITCH DeleteOrder second encode failed" << std::endl;
+            return 1;
+        }
+        
+        // Verify byte-for-byte equality
+        if (written1 != written2) {
+            std::cerr << "ITCH DeleteOrder encoded sizes differ: " << written1 << " vs " << written2 << std::endl;
+            return 1;
+        }
+        
+        if (std::memcmp(buffer1.data(), buffer2.data(), written1) != 0) {
+            std::cerr << "ITCH DeleteOrder encoded bytes differ" << std::endl;
+            return 1;
+        }
+    }
+
+#endif
+
     // Test passes - no output on success
     return 0;
-#else
-    // Generated sources not available, run stub test
-    return 0;
-#endif
 }
