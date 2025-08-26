@@ -2,6 +2,8 @@
 #include <cstring>
 #include <cassert>
 #include <iostream>
+#include "runtime/status.hpp"
+#include "runtime/bytes.hpp"
 
 // Include generated headers (only if they exist)
 #if __has_include("../generated/cboe_boe_v3/messages.hpp")
@@ -25,6 +27,14 @@
 #define HAS_GENERATED_ITCH 1
 #else
 #define HAS_GENERATED_ITCH 0
+#endif
+
+#if __has_include("../generated/cboe_boe_v3/handler.hpp")
+#include "../generated/cboe_boe_v3/handler.hpp"
+#endif
+
+#if __has_include("../generated/nasdaq_itch_5/handler.hpp")
+#include "../generated/nasdaq_itch_5/handler.hpp"
 #endif
 
 int main() {
@@ -415,6 +425,116 @@ int main() {
         }
     }
 
+#endif
+
+    // ===== DISPATCH TESTS =====
+    
+#if __has_include("../generated/cboe_boe_v3/handler.hpp")
+    // Test BOE dispatch with LoginRequest
+    {
+        using namespace cboe::boe::v3;
+        
+        // Create and encode a LoginRequest
+        LoginRequest original;
+        std::memcpy(original.Username.data(), "TEST", 4);
+        std::memcpy(original.Password.data(), "PASSWORD123456789012", 20);
+        original.MessageType = MessageType::LoginRequest;
+        
+        std::array<uint8_t, 64> buffer{};
+        size_t encoded_size = 0;
+        auto encode_status = Encoder::encode(original, buffer.data(), buffer.size(), encoded_size);
+        if (encode_status != market::runtime::status::ok) {
+            std::cerr << "BOE LoginRequest encode for dispatch test failed" << std::endl;
+            return 1;
+        }
+        
+        // Create handler functor
+        struct BOEHandler {
+            bool login_seen = false;
+            void on(const LoginRequest& msg) {
+                login_seen = true;
+            }
+            void on(const NewOrderCross& msg) {
+                // Ignore NewOrderCross for this test
+            }
+        } handler;
+        
+        // Dispatch
+        market::runtime::Bytes in_span{buffer.data(), encoded_size};
+        size_t consumed = 0;
+        auto dispatch_status = dispatch_boe(in_span, handler, consumed);
+        
+        if (dispatch_status != market::runtime::status::ok) {
+            std::cerr << "BOE dispatch failed" << std::endl;
+            return 1;
+        }
+        
+        if (!handler.login_seen) {
+            std::cerr << "BOE handler was not called" << std::endl;
+            return 1;
+        }
+        
+        if (consumed != encoded_size) {
+            std::cerr << "BOE dispatch consumed size mismatch" << std::endl;
+            return 1;
+        }
+    }
+#endif
+
+#if __has_include("../generated/nasdaq_itch_5/handler.hpp")
+    // Test ITCH dispatch with AddOrder
+    {
+        using namespace nasdaq::itch::v5;
+        
+        // Create and encode an AddOrder
+        AddOrder original;
+        original.Type = 'A';
+        original.Timestamp = 123456u;
+        original.OrderId = 0x1234567890ABCDEFULL;
+        original.Side = 'B';
+        original.Shares = 1000u;
+        std::memcpy(original.Symbol.data(), "TESTSMBL", 8);
+        original.Price = 50000u;
+        
+        std::array<uint8_t, 64> buffer{};
+        size_t encoded_size = 0;
+        auto encode_status = nasdaq::itch::v5::Encoder::encode(original, buffer.data(), buffer.size(), encoded_size);
+        if (encode_status != market::runtime::status::ok) {
+            std::cerr << "ITCH AddOrder encode for dispatch test failed" << std::endl;
+            return 1;
+        }
+        
+        // Create handler functor
+        struct ITCHHandler {
+            bool add_order_seen = false;
+            void on(const AddOrder& msg) {
+                add_order_seen = true;
+            }
+            void on(const DeleteOrder& msg) {
+                // Ignore DeleteOrder for this test
+            }
+        } handler;
+        
+        // Dispatch
+        market::runtime::Bytes in_span{buffer.data(), encoded_size};
+        size_t consumed = 0;
+        auto dispatch_status = dispatch_itch(in_span, handler, consumed);
+        
+        if (dispatch_status != market::runtime::status::ok) {
+            std::cerr << "ITCH dispatch failed" << std::endl;
+            return 1;
+        }
+        
+        if (!handler.add_order_seen) {
+            std::cerr << "ITCH handler was not called" << std::endl;
+            return 1;
+        }
+        
+        if (consumed != encoded_size) {
+            std::cerr << "ITCH dispatch consumed size mismatch" << std::endl;
+            return 1;
+        }
+    }
 #endif
 
     // Test passes - no output on success
