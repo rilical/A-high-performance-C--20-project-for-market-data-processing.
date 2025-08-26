@@ -281,6 +281,18 @@ ITER=5000000 ./build/bench/bench_encode_decode
 - **Maintainable**: Generated code is human-readable and debuggable
 - **Portable**: C++20 standard, works on Linux/macOS/Windows
 
+## 📝 Examples
+
+Two runnable examples demonstrate basic BOE usage:
+
+```bash
+# Encode a BOE LoginRequest and print hex
+./build/examples/encode_boe_login
+
+# Decode a BOE LoginRequest from hex file
+./build/examples/decode_boe_login tests/fixtures/boe_login.hex
+```
+
 ## 🤝 Contributing
 
 1. **Schema Changes**: Edit `schemas/*.yaml` and regenerate

@@ -3,9 +3,9 @@
 
 #include "messages.hpp"
 #include "decoder.hpp"
-#include "../../runtime/bytes.hpp"
-#include "../../runtime/status.hpp"
-#include "../../runtime/endian.hpp"
+#include "runtime/bytes.hpp"
+#include "runtime/status.hpp"
+#include "runtime/endian.hpp"
 
 {%- set ns_parts = protocol.split('_') %}
 {%- if ns_parts|length > 1 %}
