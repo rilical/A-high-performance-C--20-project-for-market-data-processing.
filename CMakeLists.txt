@@ -11,3 +11,18 @@ enable_testing()
 
 add_subdirectory(tests)
 add_subdirectory(bench)
+
+# Add generated sources to bench target if they exist
+if(EXISTS "${CMAKE_SOURCE_DIR}/generated/cboe_boe_v3/encoder.cpp")
+    target_sources(bench_encode_decode PRIVATE
+        generated/cboe_boe_v3/encoder.cpp
+        generated/cboe_boe_v3/decoder.cpp
+    )
+endif()
+
+if(EXISTS "${CMAKE_SOURCE_DIR}/generated/nasdaq_itch_5/encoder.cpp")
+    target_sources(bench_encode_decode PRIVATE
+        generated/nasdaq_itch_5/encoder.cpp
+        generated/nasdaq_itch_5/decoder.cpp
+    )
+endif()
