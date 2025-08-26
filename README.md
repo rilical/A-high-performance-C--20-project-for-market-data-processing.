@@ -1,4 +1,4 @@
-# Zero-allocation C++20 market data protocol encoder/decoder with code generation from YAML schemas**
+# Zero-allocation C++20 market data protocol encoder/decoder with code generation from YAML schemas
 
 A high-performance, header-only library for encoding and decoding binary market data protocols (BOE, ITCH) with compile-time type safety, runtime validation, and sub-microsecond latency.
 
