@@ -1,1 +1,2 @@
 add_executable(bench_encode_decode bench_encode_decode.cpp)
+target_include_directories(bench_encode_decode PRIVATE ${CMAKE_SOURCE_DIR})

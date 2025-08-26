@@ -16,6 +16,7 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/generated/nasdaq_itch_5/encoder.cpp")
 endif()
 
 add_executable(test_roundtrip ${TEST_SOURCES})
+target_include_directories(test_roundtrip PRIVATE ${CMAKE_SOURCE_DIR})
 
 include(CTest)
 add_test(NAME test_roundtrip COMMAND test_roundtrip)
