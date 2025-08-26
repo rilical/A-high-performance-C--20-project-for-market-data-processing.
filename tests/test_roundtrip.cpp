@@ -134,7 +134,7 @@ int main() {
         // Encode to first buffer
         std::array<uint8_t, 256> buffer1{};
         size_t written1 = 0;
-        auto status1 = nasdaq::itch::v5::Encoder::encode(original, buffer1.data(), buffer1.size(), written1);
+        auto status1 = Encoder::encode(original, buffer1.data(), buffer1.size(), written1);
         
         if (status1 != market::runtime::status::ok) {
             std::cerr << "NewOrderCross encode failed (no Account)" << std::endl;
@@ -144,7 +144,7 @@ int main() {
         // Decode back to new struct
         NewOrderCross decoded;
         size_t consumed = 0;
-        auto status2 = nasdaq::itch::v5::Decoder::decode(buffer1.data(), written1, decoded, consumed);
+        auto status2 = Decoder::decode(buffer1.data(), written1, decoded, consumed);
         
         if (status2 != market::runtime::status::ok) {
             std::cerr << "NewOrderCross decode failed (no Account)" << std::endl;
@@ -164,7 +164,7 @@ int main() {
         // Re-encode decoded struct
         std::array<uint8_t, 256> buffer2{};
         size_t written2 = 0;
-        auto status3 = nasdaq::itch::v5::Encoder::encode(decoded, buffer2.data(), buffer2.size(), written2);
+        auto status3 = Encoder::encode(decoded, buffer2.data(), buffer2.size(), written2);
         
         if (status3 != market::runtime::status::ok) {
             std::cerr << "NewOrderCross second encode failed (no Account)" << std::endl;
@@ -212,7 +212,7 @@ int main() {
         // Encode to first buffer
         std::array<uint8_t, 256> buffer1{};
         size_t written1 = 0;
-        auto status1 = nasdaq::itch::v5::Encoder::encode(original, buffer1.data(), buffer1.size(), written1);
+        auto status1 = Encoder::encode(original, buffer1.data(), buffer1.size(), written1);
         
         if (status1 != market::runtime::status::ok) {
             std::cerr << "NewOrderCross encode failed (with Account)" << std::endl;
@@ -222,7 +222,7 @@ int main() {
         // Decode back to new struct
         NewOrderCross decoded;
         size_t consumed = 0;
-        auto status2 = nasdaq::itch::v5::Decoder::decode(buffer1.data(), written1, decoded, consumed);
+        auto status2 = Decoder::decode(buffer1.data(), written1, decoded, consumed);
         
         if (status2 != market::runtime::status::ok) {
             std::cerr << "NewOrderCross decode failed (with Account)" << std::endl;
@@ -253,7 +253,7 @@ int main() {
         // Re-encode decoded struct
         std::array<uint8_t, 256> buffer2{};
         size_t written2 = 0;
-        auto status3 = nasdaq::itch::v5::Encoder::encode(decoded, buffer2.data(), buffer2.size(), written2);
+        auto status3 = Encoder::encode(decoded, buffer2.data(), buffer2.size(), written2);
         
         if (status3 != market::runtime::status::ok) {
             std::cerr << "NewOrderCross second encode failed (with Account)" << std::endl;
