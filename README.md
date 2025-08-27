@@ -291,6 +291,25 @@ Two runnable examples demonstrate basic BOE usage:
 ./build/examples/decode_boe_login tests/fixtures/boe_login.hex
 ```
 
+## 🏭 Is it production-ready?
+
+**Strengths:**
+- **API & Build System**: Clean CMake integration, header-only runtime, deterministic code generation
+- **Performance Posture**: Sub-microsecond latency, zero-allocation design, extensive benchmarking
+- **Correctness Tooling**: Round-trip testing, libFuzzer harness, schema validation with detailed error reporting
+- **Thread-Safety Stance**: Generated encoders/decoders are thread-safe (stateless, immutable POD structs)
+
+**Current Gaps:**
+- Package management and semantic versioning strategy
+- CI matrix with sanitizers (TSAN/UBSAN/ASAN) across compilers
+- Static analysis integration (clang-tidy, cppcheck)
+- Multi-threaded stress testing and race condition validation
+- CMake install/export rules for downstream consumption
+- Symbol visibility controls and ABI stability
+- Broader schema coverage beyond BOE v3 and ITCH v5
+
+**➡️ See [Production Hardening Guide](docs/production.md) for a detailed checklist and remediation steps.**
+
 ## 🤝 Contributing
 
 1. **Schema Changes**: Edit `schemas/*.yaml` and regenerate
