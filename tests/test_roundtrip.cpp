@@ -452,9 +452,11 @@ int main() {
         struct BOEHandler {
             bool login_seen = false;
             void on(const LoginRequest& msg) {
+                (void)msg;
                 login_seen = true;
             }
             void on(const NewOrderCross& msg) {
+                (void)msg;
                 // Ignore NewOrderCross for this test
             }
         } handler;
@@ -508,9 +510,11 @@ int main() {
         struct ITCHHandler {
             bool add_order_seen = false;
             void on(const AddOrder& msg) {
+                (void)msg;
                 add_order_seen = true;
             }
             void on(const DeleteOrder& msg) {
+                (void)msg;
                 // Ignore DeleteOrder for this test
             }
         } handler;

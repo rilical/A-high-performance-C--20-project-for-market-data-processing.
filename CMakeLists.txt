@@ -7,6 +7,35 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG -Wall -Wextra -Wpedantic")
 
+# Configuration options
+option(EXCHCG_NO_EXCEPTIONS "Disable C++ exceptions" OFF)
+option(EXCHCG_HIDE_SYMBOLS "Hide symbols by default (use -fvisibility=hidden)" OFF)
+option(EXCHCG_STRICT_WARNINGS "Treat warnings as errors" OFF)
+
+# Apply configuration-specific compiler flags
+if(EXCHCG_NO_EXCEPTIONS)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHs-c-")
+    endif()
+    add_compile_definitions(EXCHCG_NO_EXCEPTIONS)
+endif()
+
+if(EXCHCG_HIDE_SYMBOLS)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
+    endif()
+endif()
+
+if(EXCHCG_STRICT_WARNINGS)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /WX")
+    endif()
+endif()
+
 enable_testing()
 
 add_subdirectory(tests)
