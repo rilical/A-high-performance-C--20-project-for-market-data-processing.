@@ -56,7 +56,7 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/generated/nasdaq_itch_5/encoder.cpp")
     )
 endif()
 
-# Examples target (only if BOE generated sources exist)
+# Examples target (BOE)
 if(EXISTS "${CMAKE_SOURCE_DIR}/generated/cboe_boe_v3/encoder.cpp")
     add_executable(encode_boe_login examples/encode_boe_login.cpp)
     target_include_directories(encode_boe_login PRIVATE .)
@@ -74,6 +74,28 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/generated/cboe_boe_v3/encoder.cpp")
     
     # Group examples under examples folder in IDEs
     set_target_properties(encode_boe_login decode_boe_login PROPERTIES
+        FOLDER "examples"
+    )
+endif()
+
+# Examples target (ITCH)
+if(EXISTS "${CMAKE_SOURCE_DIR}/generated/nasdaq_itch_5/encoder.cpp")
+    add_executable(encode_itch_add examples/encode_itch_add.cpp)
+    target_include_directories(encode_itch_add PRIVATE .)
+    target_sources(encode_itch_add PRIVATE
+        generated/nasdaq_itch_5/encoder.cpp
+        generated/nasdaq_itch_5/decoder.cpp
+    )
+
+    add_executable(decode_itch_add examples/decode_itch_add.cpp)
+    target_include_directories(decode_itch_add PRIVATE .)
+    target_sources(decode_itch_add PRIVATE
+        generated/nasdaq_itch_5/encoder.cpp
+        generated/nasdaq_itch_5/decoder.cpp
+    )
+
+    # Group examples under examples folder in IDEs
+    set_target_properties(encode_itch_add decode_itch_add PROPERTIES
         FOLDER "examples"
     )
 endif()

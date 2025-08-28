@@ -7,17 +7,148 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-matrix:
+    name: Build (${{ matrix.os }}, ${{ matrix.compiler }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        compiler: [gcc, clang, msvc]
+        exclude:
+          - os: windows-latest
+            compiler: gcc
+          - os: windows-latest
+            compiler: clang
+          - os: macos-latest
+            compiler: gcc  # Apple GCC is clang; use clang explicitly
+          - os: macos-latest
+            compiler: msvc
+          - os: ubuntu-latest
+            compiler: msvc
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Configure CMake
-      run: cmake -S . -B build
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
-    - name: Build
-      run: cmake --build build -j
+      - name: Install Python deps
+        run: pip install --upgrade pip && pip install Jinja2 PyYAML
 
-    - name: Test
-      run: ctest --test-dir build --output-on-failure
+      - name: Install toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake clang clang-tidy
+
+      - name: Install toolchain (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install cmake llvm clang-format clang-tidy || true
+
+      - name: Select compiler
+        if: runner.os != 'Windows'
+        run: |
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            echo "CC=gcc" >> $GITHUB_ENV
+            echo "CXX=g++" >> $GITHUB_ENV
+          elif [ "${{ matrix.compiler }}" = "clang" ]; then
+            echo "CC=clang" >> $GITHUB_ENV
+            echo "CXX=clang++" >> $GITHUB_ENV
+          fi
+
+      - name: Generate code from schemas
+        run: |
+          python3 codegen/generate.py --schema schemas/cboe_boe_v3.yaml --out generated/cboe_boe_v3
+          python3 codegen/generate.py --schema schemas/nasdaq_itch_5.yaml --out generated/nasdaq_itch_5
+
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+            ${{ (runner.os != 'Windows' && matrix.compiler == 'clang') && '-DCMAKE_CXX_CLANG_TIDY=clang-tidy' || '' }}
+
+      - name: Build
+        run: |
+          cmake --build build --parallel
+
+      - name: Test
+        run: |
+          ctest --test-dir build --output-on-failure
+
+  sanitizers:
+    name: Sanitizers (${{ matrix.sanitizer }}, ${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [clang, gcc]
+        sanitizer: [asan-ubsan, tsan]
+        exclude:
+          - compiler: gcc
+            sanitizer: tsan
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake clang
+          pip install Jinja2 PyYAML
+      - name: Select compiler
+        run: |
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            echo "CC=gcc" >> $GITHUB_ENV
+            echo "CXX=g++" >> $GITHUB_ENV
+          else
+            echo "CC=clang" >> $GITHUB_ENV
+            echo "CXX=clang++" >> $GITHUB_ENV
+          fi
+      - name: Generate code
+        run: |
+          python3 codegen/generate.py --schema schemas/cboe_boe_v3.yaml --out generated/cboe_boe_v3
+          python3 codegen/generate.py --schema schemas/nasdaq_itch_5.yaml --out generated/nasdaq_itch_5
+      - name: Configure (ASAN/UBSAN)
+        if: matrix.sanitizer == 'asan-ubsan'
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -O1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+      - name: Configure (TSAN)
+        if: matrix.sanitizer == 'tsan'
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -O1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  fuzz-smoke:
+    name: Fuzz smoke (clang/libFuzzer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+          pip install Jinja2 PyYAML
+      - name: Generate code
+        run: |
+          python3 codegen/generate.py --schema schemas/cboe_boe_v3.yaml --out generated/cboe_boe_v3
+      - name: Build fuzz target
+        run: |
+          clang++ -std=c++20 -fsanitize=fuzzer,address,undefined -O2 -I. \
+            generated/cboe_boe_v3/decoder.cpp tests/fuzz_decode_boe.cpp -o fuzz_boe
+      - name: Run fuzz (short)
+        run: ./fuzz_boe -runs=20000 -max_total_time=20
