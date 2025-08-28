@@ -22,18 +22,9 @@ namespace {{ protocol }} { namespace v{{ version }} {
 // Encoder for {{ protocol }} v{{ version }}
 class Encoder {
 public:
-{%- if schema.get('messages', {}).get('LoginRequest') %}
-    static market::runtime::status encode(const LoginRequest& m, uint8_t* out, size_t out_sz, size_t& written);
-{%- endif %}
-{%- if schema.get('messages', {}).get('NewOrderCross') %}
-    static market::runtime::status encode(const NewOrderCross& m, uint8_t* out, size_t out_sz, size_t& written);
-{%- endif %}
-{%- if schema.get('messages', {}).get('AddOrder') %}
-    static market::runtime::status encode(const AddOrder& m, uint8_t* out, size_t out_sz, size_t& written);
-{%- endif %}
-{%- if schema.get('messages', {}).get('DeleteOrder') %}
-    static market::runtime::status encode(const DeleteOrder& m, uint8_t* out, size_t out_sz, size_t& written);
-{%- endif %}
+{%- for msg in model.messages %}
+    static market::runtime::status encode(const {{ msg.name }}& m, uint8_t* out, size_t out_sz, size_t& written);
+{%- endfor %}
 };
 
 {%- if ns_parts|length > 1 %}

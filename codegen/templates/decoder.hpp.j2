@@ -22,19 +22,33 @@ namespace {{ protocol }} { namespace v{{ version }} {
 // Decoder for {{ protocol }} v{{ version }}
 class Decoder {
 public:
-{%- if schema.get('messages', {}).get('LoginRequest') %}
-    static market::runtime::status decode(const uint8_t* in, size_t in_sz, LoginRequest& out, size_t& consumed);
-{%- endif %}
-{%- if schema.get('messages', {}).get('NewOrderCross') %}
-    static market::runtime::status decode(const uint8_t* in, size_t in_sz, NewOrderCross& out, size_t& consumed);
-{%- endif %}
-{%- if schema.get('messages', {}).get('AddOrder') %}
-    static market::runtime::status decode(const uint8_t* in, size_t in_sz, AddOrder& out, size_t& consumed);
-{%- endif %}
-{%- if schema.get('messages', {}).get('DeleteOrder') %}
-    static market::runtime::status decode(const uint8_t* in, size_t in_sz, DeleteOrder& out, size_t& consumed);
-{%- endif %}
+{%- for msg in model.messages %}
+    static market::runtime::status decode(const uint8_t* in, size_t in_sz, {{ msg.name }}& out, size_t& consumed);
+{%- endfor %}
 };
+
+// Streaming decoder states and APIs
+{%- for msg in model.messages %}
+
+struct {{ msg.name }}_stream_state {
+    size_t stage{0};
+    size_t offset{0};
+    size_t group_index{0};
+    size_t expected_length{0};
+    uint64_t presence_bits{0};
+    {{ msg.name }} out;
+};
+
+inline market::runtime::status decode_stream({{ msg.name }}_stream_state& st, const uint8_t* in, size_t in_sz, size_t& consumed) {
+    using market::runtime::status;
+    consumed = 0;
+    {% if not msg.has_groups and not msg.has_optional %}
+    constexpr size_t EXPECTED = {{ msg.fixed_bytes }};
+    if (in_sz < EXPECTED) { return status::short_buffer; }
+    {% endif %}
+    return Decoder::decode(in, in_sz, st.out, consumed);
+}
+{%- endfor %}
 
 {%- if ns_parts|length > 1 %}
 }  // namespace v{{ version }}

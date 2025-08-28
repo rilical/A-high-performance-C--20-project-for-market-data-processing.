@@ -19,12 +19,12 @@ namespace {{ ns_parts[0] }} { namespace {{ ns_parts[1] }} { namespace v{{ versio
 namespace {{ protocol }} { namespace v{{ version }} {
 {%- endif %}
 
-{%- if schema.get('enums') %}
+{%- if model.enums %}
 
 // Enums
-{% for enum_name, enum_values in schema.get('enums', {}).items() %}
-enum class {{ enum_name }} : uint32_t {
-{%- for value_name, value_num in enum_values.items() %}
+{% for enum in model.enums %}
+enum class {{ enum.name }} : {{ enum.underlying }} {
+{%- for value_name, value_num in enum["values"].items() %}
     {{ value_name }} = {{ value_num }},
 {%- endfor %}
 };
@@ -32,27 +32,15 @@ enum class {{ enum_name }} : uint32_t {
 {% endfor %}
 {%- endif %}
 
-{%- macro map_type(field) -%}
-{%- if field.type == 'u8' -%}uint8_t
-{%- elif field.type == 'u16' -%}uint16_t
-{%- elif field.type == 'u32' -%}uint32_t
-{%- elif field.type == 'u64' -%}uint64_t
-{%- elif field.type == 'char' and field.get('length') -%}std::array<char, {{ field.length }}>
-{%- elif field.type == 'char' -%}char
-{%- elif field.type == 'enum' -%}{{ field.enum_type }}
-{%- else -%}{{ field.type }}
-{%- endif -%}
-{%- endmacro %}
-
-{%- if schema.get('messages') %}
+{%- if model.messages %}
 
 // Group structures
-{% for message_name, message_def in schema.get('messages', {}).items() %}
-{%- if message_def.get('groups') %}
-{%- for group in message_def.get('groups', []) %}
-struct {{ message_name }}{{ group.name }} {
-{%- for field in group.get('fields', []) %}
-    {{ map_type(field) }} {{ field.name }}{};
+{% for msg in model.messages %}
+{%- if msg.groups %}
+{%- for group in msg.groups %}
+struct {{ msg.name }}{{ group.name }} {
+{%- for field in group.fields %}
+    {{ field.cxx_type }} {{ field.name }}{};
 {%- endfor %}
 };
 
@@ -61,14 +49,14 @@ struct {{ message_name }}{{ group.name }} {
 {% endfor %}
 
 // Message structures
-{% for message_name, message_def in schema.get('messages', {}).items() %}
-struct {{ message_name }} {
-{%- for field in message_def.get('fields', []) %}
-    {{ map_type(field) }} {{ field.name }}{};
+{% for msg in model.messages %}
+struct {{ msg.name }} {
+{%- for field in msg.fields %}
+    {{ field.cxx_type }} {{ field.name }}{};
 {%- endfor %}
-{%- if message_def.get('groups') %}
-{%- for group in message_def.get('groups', []) %}
-    std::vector<{{ message_name }}{{ group.name }}> {{ group.name.lower() }};
+{%- if msg.groups %}
+{%- for group in msg.groups %}
+    std::vector<{{ msg.name }}{{ group.name }}> {{ group.vector_name }};
 {%- endfor %}
 {%- endif %}
 };

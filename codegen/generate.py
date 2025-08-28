@@ -275,6 +275,179 @@ def validate_schema(schema, schema_path):
                             if presence_map_field is None:
                                 error(f"messages.{message_name}.groups[{group_idx}].fields[{field_idx}].optional_bit", "optional_bit specified but no presence map found in message")
 
+def build_model(schema):
+    """Build a generation model with computed enum widths and message metadata."""
+    def parse_enum_value(v):
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str):
+            return int(v, 16) if v.lower().startswith("0x") else int(v)
+        raise ValueError(f"Unsupported enum value type: {type(v)}")
+
+    # Enums info
+    enums_info = {}
+    for enum_name, enum_def in schema.get('enums', {}).items():
+        values = {k: parse_enum_value(v) for k, v in enum_def.items()}
+        max_val = max(values.values()) if values else 0
+        if max_val <= 0xFF:
+            underlying = 'uint8_t'
+            width_bytes = 1
+        elif max_val <= 0xFFFF:
+            underlying = 'uint16_t'
+            width_bytes = 2
+        elif max_val <= 0xFFFFFFFF:
+            underlying = 'uint32_t'
+            width_bytes = 4
+        else:
+            underlying = 'uint64_t'
+            width_bytes = 8
+        enums_info[enum_name] = {
+            'name': enum_name,
+            'underlying': underlying,
+            'width_bytes': width_bytes,
+            'values': values,
+        }
+
+    # Helper to compute field size and c++ type
+    def field_cxx_type(field):
+        t = field['type']
+        if t == 'u8':
+            return 'uint8_t'
+        if t == 'u16':
+            return 'uint16_t'
+        if t == 'u32':
+            return 'uint32_t'
+        if t == 'u64':
+            return 'uint64_t'
+        if t == 'char':
+            if 'length' in field:
+                return f"std::array<char, {int(field['length'])}>"
+            return 'char'
+        if t == 'enum':
+            return field['enum_type']
+        if t.startswith('enum:'):
+            return t.split(':', 1)[1]
+        # Allow numeric types carrying enum_type for user convenience
+        if 'enum_type' in field and t in ['u8','u16','u32','u64']:
+            return t
+        return t
+
+    def field_size_bytes(field):
+        t = field['type']
+        if t == 'u8':
+            return 1
+        if t == 'u16':
+            return 2
+        if t == 'u32':
+            return 4
+        if t == 'u64':
+            return 8
+        if t == 'char':
+            return int(field.get('length', 1))
+        if t == 'enum':
+            enum_name = field['enum_type']
+            return enums_info[enum_name]['width_bytes']
+        if t.startswith('enum:'):
+            enum_name = t.split(':', 1)[1]
+            return enums_info[enum_name]['width_bytes']
+        # If user uses primitive with enum_type, size is primitive
+        if t in ['u8','u16','u32','u64']:
+            return {'u8':1,'u16':2,'u32':4,'u64':8}[t]
+        raise ValueError(f"Unsupported field type for size: {t}")
+
+    # Messages info
+    messages_info = []
+    for msg_name, msg_def in schema.get('messages', {}).items():
+        fields = msg_def.get('fields', [])
+        presence_field = None
+        presence_width = 0
+        for f in fields:
+            if f.get('purpose') == 'presence_map':
+                presence_field = f['name']
+                t = f['type']
+                presence_width = {'u8':8,'u16':16,'u32':32,'u64':64}.get(t, 0)
+                break
+
+        # detect length field heuristically
+        length_field_name = None
+        for f in fields:
+            n = f.get('name','')
+            if n in ('MessageLength','Length','MsgLength','MessageSize') and f.get('type') in ('u8','u16','u32','u64'):
+                length_field_name = n
+                break
+
+        # model fields
+        model_fields = []
+        for f in fields:
+            mf = {
+                'name': f['name'],
+                'type': f['type'],
+                'cxx_type': field_cxx_type(f),
+                'size': field_size_bytes(f),
+                'endian': f.get('endian'),
+                'has_value': 'value' in f,
+                'value': f.get('value'),
+                'optional_bit': f.get('optional_bit'),
+                'is_presence_map': f.get('purpose') == 'presence_map',
+                'enum_type': f.get('enum_type'),
+            }
+            model_fields.append(mf)
+
+        # groups info
+        groups_info = []
+        for g in msg_def.get('groups', []) or []:
+            group_fields = []
+            for gf in g.get('fields', []):
+                mgf = {
+                    'name': gf['name'],
+                    'type': gf['type'],
+                    'cxx_type': field_cxx_type(gf),
+                    'size': field_size_bytes(gf),
+                    'endian': gf.get('endian'),
+                    'has_value': 'value' in gf,
+                    'value': gf.get('value'),
+                    'optional_bit': gf.get('optional_bit'),
+                    'enum_type': gf.get('enum_type'),
+                }
+                group_fields.append(mgf)
+            vec_name = g['name'].lower()
+            groups_info.append({
+                'name': g['name'],
+                'vector_name': vec_name,
+                'count_field': g.get('count_field'),
+                'fields': group_fields,
+            })
+        count_field_map = {g['count_field']: g['vector_name'] for g in groups_info if g.get('count_field')}
+
+        # compute fixed bytes (fields without optional bits and excluding groups)
+        fixed_bytes = 0
+        has_optional = False
+        for f in model_fields:
+            if f['optional_bit'] is not None:
+                has_optional = True
+            else:
+                fixed_bytes += f['size']
+
+        messages_info.append({
+            'name': msg_name,
+            'fields': model_fields,
+            'presence_field': presence_field,
+            'presence_width': presence_width,
+            'length_field': length_field_name,
+            'groups': groups_info,
+            'count_field_map': count_field_map,
+            'fixed_bytes': fixed_bytes,
+            'has_optional': has_optional,
+            'has_groups': bool(groups_info),
+        })
+
+    return {
+        'enums': list(enums_info.values()),
+        'enums_map': enums_info,
+        'messages': messages_info,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description='Generate C++ code from YAML schema')
     parser.add_argument('--schema', required=True, help='Input YAML schema file')
@@ -310,12 +483,16 @@ def main():
         lstrip_blocks=True
     )
     
+    # Build generation model with computed metadata
+    model = build_model(schema)
+    
     # Template context
     context = {
         'schema': schema,
         'protocol': protocol,
         'version': version,
-        'namespace': namespace
+        'namespace': namespace,
+        'model': model
     }
     
     # Template files to generate
