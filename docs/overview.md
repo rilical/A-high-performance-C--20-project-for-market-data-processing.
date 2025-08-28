@@ -198,6 +198,17 @@ Templates are designed for extension:
 - **Random Generation**: Stress test with valid random messages
 - **Invariant Checking**: Ensure encode/decode properties hold
 
+## Troubleshooting Decode Failures
+
+- Bad preamble (BOE): Ensure first two bytes are 0xBABA little-endian and `MessageLength` matches total bytes. If `unknown_type`, verify `MessageType` matches the concrete message you're trying to parse.
+- Short buffer: The decoder returns `short_buffer` when `in_sz` is smaller than the required bytes for a field; provide a larger slice or use the streaming overloads that return `short_buffer` until complete.
+- Presence map mismatch: Optional fields controlled by presence bits must be set/cleared consistently. For BOE `NewOrderCross`, bit 9 controls the `Account` field within groups.
+- ITCH type mismatches: The first byte of ITCH messages is the type; ensure it matches the message you feed into the decoder (e.g., 'A' for AddOrder).
+
+Examples (hex):
+- BOE LoginRequest (29 bytes): `baba1d0001414243444142434445464748494a4b4c4d4e4f50515253`
+- ITCH AddOrder (30 bytes, sample): `410001e240010203040506070842000003e841424344454620200001e23a`
+
 ### Performance Testing
 
 - **Micro-Benchmarks**: Isolated encode/decode timing

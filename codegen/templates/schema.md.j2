@@ -1,0 +1,39 @@
+# Protocol {{ protocol }} v{{ version }}
+
+## Enums
+{% if model.enums %}
+{% for enum in model.enums %}
+### {{ enum.name }} ({{ enum.underlying }})
+| Name | Value |
+|------|-------|
+{% for name, val in enum["values"].items() %}
+| {{ name }} | {{ val }} |
+{% endfor %}
+
+{% endfor %}
+{% else %}
+_No enums defined._
+{% endif %}
+
+## Messages
+{% for msg in model.messages %}
+### {{ msg.name }}
+| Field | Type | Size | Endian | Optional |
+|-------|------|------|--------|----------|
+{% for f in msg.fields %}
+| {{ f.name }} | {{ f.type }}{% if f.type == 'enum' %}:{{ f.enum_type }}{% endif %} | {{ f.size }} | {{ f.endian or '-' }} | {{ f.optional_bit is not none and ('bit ' ~ f.optional_bit) or '-' }} |
+{% endfor %}
+{% if msg.groups %}
+Groups:
+{% for g in msg.groups %}
+- {{ g.name }} (vector: {{ g.vector_name }}, count_field: {{ g.count_field }})
+  | Field | Type | Size | Endian | Optional |
+  |-------|------|------|--------|----------|
+  {% for gf in g.fields %}
+  | {{ gf.name }} | {{ gf.type }}{% if gf.type == 'enum' %}:{{ gf.enum_type }}{% endif %} | {{ gf.size }} | {{ gf.endian or '-' }} | {{ gf.optional_bit is not none and ('bit ' ~ gf.optional_bit) or '-' }} |
+  {% endfor %}
+{% endfor %}
+{% endif %}
+
+{% endfor %}
+

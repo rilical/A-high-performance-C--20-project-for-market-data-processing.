@@ -6,6 +6,7 @@
 #include "messages.hpp"
 #include "runtime/status.hpp"
 #include "runtime/endian.hpp"
+#include "runtime/bytes.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -24,6 +25,9 @@ class Encoder {
 public:
 {%- for msg in model.messages %}
     static market::runtime::status encode(const {{ msg.name }}& m, uint8_t* out, size_t out_sz, size_t& written);
+    static inline market::runtime::status encode(const {{ msg.name }}& m, market::runtime::MutBytes out, size_t& written) {
+        return encode(m, out.data(), out.size(), written);
+    }
 {%- endfor %}
 };
 

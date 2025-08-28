@@ -146,9 +146,14 @@ jobs:
       - name: Generate code
         run: |
           python3 codegen/generate.py --schema schemas/cboe_boe_v3.yaml --out generated/cboe_boe_v3
-      - name: Build fuzz target
+          python3 codegen/generate.py --schema schemas/nasdaq_itch_5.yaml --out generated/nasdaq_itch_5
+      - name: Build fuzz targets
         run: |
           clang++ -std=c++20 -fsanitize=fuzzer,address,undefined -O2 -I. \
             generated/cboe_boe_v3/decoder.cpp tests/fuzz_decode_boe.cpp -o fuzz_boe
+          clang++ -std=c++20 -fsanitize=fuzzer,address,undefined -O2 -I. \
+            generated/nasdaq_itch_5/decoder.cpp tests/fuzz_decode_itch.cpp -o fuzz_itch
       - name: Run fuzz (short)
-        run: ./fuzz_boe -runs=20000 -max_total_time=20
+        run: |
+          ./fuzz_boe -runs=20000 -max_total_time=20
+          ./fuzz_itch -runs=20000 -max_total_time=20

@@ -8,21 +8,23 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG -Wall -Wextra -Wpedantic")
 
 # Configuration options
-option(EXCHCG_NO_EXCEPTIONS "Disable C++ exceptions" OFF)
-option(EXCHCG_HIDE_SYMBOLS "Hide symbols by default (use -fvisibility=hidden)" OFF)
+option(MARKET_NO_EXCEPTIONS "Disable C++ exceptions" OFF)
+option(MARKET_HIDE_SYMBOLS "Hide symbols by default (use -fvisibility=hidden)" OFF)
+option(EXCHCG_NO_EXCEPTIONS "(compat) Disable C++ exceptions" OFF)
+option(EXCHCG_HIDE_SYMBOLS "(compat) Hide symbols by default" OFF)
 option(EXCHCG_STRICT_WARNINGS "Treat warnings as errors" OFF)
 
 # Apply configuration-specific compiler flags
-if(EXCHCG_NO_EXCEPTIONS)
+if(MARKET_NO_EXCEPTIONS OR EXCHCG_NO_EXCEPTIONS)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions")
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHs-c-")
     endif()
-    add_compile_definitions(EXCHCG_NO_EXCEPTIONS)
+    add_compile_definitions(MARKET_NO_EXCEPTIONS)
 endif()
 
-if(EXCHCG_HIDE_SYMBOLS)
+if(MARKET_HIDE_SYMBOLS OR EXCHCG_HIDE_SYMBOLS)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
     endif()
@@ -94,8 +96,80 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/generated/nasdaq_itch_5/encoder.cpp")
         generated/nasdaq_itch_5/decoder.cpp
     )
 
+    add_executable(encode_itch_delete examples/encode_itch_delete.cpp)
+    target_include_directories(encode_itch_delete PRIVATE .)
+    target_sources(encode_itch_delete PRIVATE
+        generated/nasdaq_itch_5/encoder.cpp
+        generated/nasdaq_itch_5/decoder.cpp
+    )
+
+    add_executable(decode_itch_delete examples/decode_itch_delete.cpp)
+    target_include_directories(decode_itch_delete PRIVATE .)
+    target_sources(decode_itch_delete PRIVATE
+        generated/nasdaq_itch_5/encoder.cpp
+        generated/nasdaq_itch_5/decoder.cpp
+    )
+
     # Group examples under examples folder in IDEs
-    set_target_properties(encode_itch_add decode_itch_add PROPERTIES
+    set_target_properties(encode_itch_add decode_itch_add encode_itch_delete decode_itch_delete PROPERTIES
         FOLDER "examples"
     )
 endif()
+# Tools
+add_executable(mdp_dump tools/mdp_dump.cpp)
+target_include_directories(mdp_dump PRIVATE ${CMAKE_SOURCE_DIR})
+if(EXISTS "${CMAKE_SOURCE_DIR}/generated/cboe_boe_v3/encoder.cpp")
+  target_sources(mdp_dump PRIVATE
+    generated/cboe_boe_v3/encoder.cpp
+    generated/cboe_boe_v3/decoder.cpp
+    generated/cboe_boe_v3/json.cpp
+  )
+endif()
+if(EXISTS "${CMAKE_SOURCE_DIR}/generated/nasdaq_itch_5/encoder.cpp")
+  target_sources(mdp_dump PRIVATE
+    generated/nasdaq_itch_5/encoder.cpp
+    generated/nasdaq_itch_5/decoder.cpp
+    generated/nasdaq_itch_5/json.cpp
+  )
+endif()
+
+add_executable(pcap_decode tools/pcap_decode/pcap_decode.cpp)
+target_include_directories(pcap_decode PRIVATE ${CMAKE_SOURCE_DIR})
+if(EXISTS "${CMAKE_SOURCE_DIR}/generated/cboe_boe_v3/encoder.cpp")
+  target_sources(pcap_decode PRIVATE
+    generated/cboe_boe_v3/encoder.cpp
+    generated/cboe_boe_v3/decoder.cpp
+    generated/cboe_boe_v3/json.cpp
+  )
+endif()
+if(EXISTS "${CMAKE_SOURCE_DIR}/generated/nasdaq_itch_5/encoder.cpp")
+  target_sources(pcap_decode PRIVATE
+    generated/nasdaq_itch_5/encoder.cpp
+    generated/nasdaq_itch_5/decoder.cpp
+    generated/nasdaq_itch_5/json.cpp
+  )
+endif()
+
+# Install/export
+include(GNUInstallDirs)
+add_library(market_runtime INTERFACE)
+add_library(market::runtime ALIAS market_runtime)
+target_include_directories(market_runtime INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/market>
+)
+
+install(DIRECTORY runtime/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/market/runtime)
+if(EXISTS "${CMAKE_SOURCE_DIR}/generated")
+  install(DIRECTORY generated/
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/market/generated)
+endif()
+
+install(TARGETS market_runtime EXPORT market-targets)
+install(EXPORT market-targets
+        NAMESPACE market::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/market)
+
+install(FILES market-config.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/market)

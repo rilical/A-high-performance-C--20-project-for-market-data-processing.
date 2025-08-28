@@ -6,6 +6,7 @@
 #include "messages.hpp"
 #include "runtime/status.hpp"
 #include "runtime/endian.hpp"
+#include "runtime/bytes.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -24,6 +25,9 @@ class Decoder {
 public:
 {%- for msg in model.messages %}
     static market::runtime::status decode(const uint8_t* in, size_t in_sz, {{ msg.name }}& out, size_t& consumed);
+    static inline market::runtime::status decode(market::runtime::Bytes in, {{ msg.name }}& out, size_t& consumed) {
+        return decode(in.data(), in.size(), out, consumed);
+    }
 {%- endfor %}
 };
 

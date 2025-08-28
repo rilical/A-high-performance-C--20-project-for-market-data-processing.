@@ -452,6 +452,7 @@ def main():
     parser = argparse.ArgumentParser(description='Generate C++ code from YAML schema')
     parser.add_argument('--schema', required=True, help='Input YAML schema file')
     parser.add_argument('--out', required=True, help='Output directory')
+    parser.add_argument('--check', action='store_true', help='Validate schema only, no code generation')
     
     args = parser.parse_args()
     
@@ -470,6 +471,10 @@ def main():
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
+    
+    if args.check:
+        # Lint only
+        sys.exit(0)
     
     # Extract protocol info
     protocol = schema.get('protocol', 'unknown')
@@ -503,7 +508,10 @@ def main():
         'encoder.cpp.j2',
         'decoder.hpp.j2',
         'decoder.cpp.j2',
-        'handler.hpp.j2'
+        'handler.hpp.j2',
+        'json.hpp.j2',
+        'json.cpp.j2',
+        'schema.md.j2'
     ]
     
     # Create output directory
